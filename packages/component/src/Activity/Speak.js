@@ -52,7 +52,7 @@ export default connectSpeakActivity(
         case 'application/vnd.microsoft.card.adaptive':
           lines.push(content.speak);
           break;
-
+/*
         case 'application/vnd.microsoft.card.animation':
         case 'application/vnd.microsoft.card.audio':
         case 'application/vnd.microsoft.card.video':
@@ -62,7 +62,7 @@ export default connectSpeakActivity(
           lines.push(content.subtitle);
           lines.push(content.text);
           break;
-
+*/
         case 'application/vnd.microsoft.card.receipt':
           lines.push(content.title);
           break;
