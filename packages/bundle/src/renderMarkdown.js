@@ -4,7 +4,7 @@ import sanitizeHTML from 'sanitize-html';
 
 const SANITIZE_HTML_OPTIONS = {
   allowedAttributes: {
-    a: ['href', 'name', 'target'],
+    a: ['href', 'name', 'target', 'title'],
     img: ['alt', 'src']
   },
   allowedTags: [
@@ -45,7 +45,7 @@ const SANITIZE_HTML_OPTIONS = {
 };
 
 const customMarkdownIt = new MarkdownIt({
-  breaks: true,
+  breaks: false,
   html: false,
   linkify: true,
   typographer: true,

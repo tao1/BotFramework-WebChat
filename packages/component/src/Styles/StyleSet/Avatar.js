@@ -1,19 +1,12 @@
-import {
-  primaryFont
-} from '../Fonts';
-
-export default function createAvatarStyle({
-  accent,
-  avatarSize
-}) {
+export default function createAvatarStyle({ accent, avatarSize, primaryFont }) {
   return {
-    ...primaryFont,
-
     alignItems: 'center',
     backgroundColor: accent,
     borderRadius: '50%',
     color: 'White',
+    // TODO: [P2] We should not set "display" in styleSet, this will allow the user to break the layout for no good reasons.
     display: 'flex',
+    fontFamily: primaryFont,
     height: avatarSize,
     justifyContent: 'center',
     overflow: 'hidden',

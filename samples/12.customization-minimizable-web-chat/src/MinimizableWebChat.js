@@ -1,10 +1,10 @@
-import React from 'react';
-import { createStore, createStyleSet } from 'botframework-webchat';
+import React from "react";
+import { createStore, createStyleSet } from "botframework-webchat";
 
-import WebChat from './WebChat';
+import WebChat from "./WebChat";
 
-import './fabric-icons-inline.css';
-import './MinimizableWebChat.css';
+import "./fabric-icons-inline.css";
+import "./MinimizableWebChat.css";
 
 export default class extends React.Component {
   constructor(props) {
@@ -16,23 +16,20 @@ export default class extends React.Component {
     this.handleSwitchButtonClick = this.handleSwitchButtonClick.bind(this);
 
     const store = createStore({}, ({ dispatch }) => next => action => {
-      if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
+      if (action.type === "DIRECT_LINE/CONNECT_FULFILLED") {
         setTimeout(() => {
           dispatch({
-            type: 'DIRECT_LINE/POST_ACTIVITY',
+            type: "WEB_CHAT/SEND_EVENT",
             payload: {
-              activity: {
-                name: 'webchat/join',
-                type: 'event',
-                value: {
-                  language: window.navigator.language
-                }
+              name: "webchat/join",
+              value: {
+                language: window.navigator.language
               }
             }
           });
         }, 1000);
-      } else if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
-        if (action.payload.activity.from.role === 'bot') {
+      } else if (action.type === "DIRECT_LINE/INCOMING_ACTIVITY") {
+        if (action.payload.activity.from.role === "bot") {
           this.setState(() => ({ newMessage: true }));
         }
       }
@@ -43,10 +40,10 @@ export default class extends React.Component {
     this.state = {
       minimized: true,
       newMessage: false,
-      side: 'right',
+      side: "right",
       store,
       styleSet: createStyleSet({
-        backgroundColor: 'Transparent'
+        backgroundColor: "Transparent"
       }),
       token: null
     };
@@ -54,7 +51,10 @@ export default class extends React.Component {
 
   async handleFetchToken() {
     if (!this.state.token) {
-      const res = await fetch('https://webchat-mockbot.azurewebsites.net/directline/token', { method: 'POST' });
+      const res = await fetch(
+        "https://webchat-mockbot.azurewebsites.net/directline/token",
+        { method: "POST" }
+      );
       const { token } = await res.json();
 
       this.setState(() => ({ token }));
@@ -77,62 +77,53 @@ export default class extends React.Component {
 
   handleSwitchButtonClick() {
     this.setState(({ side }) => ({
-      side: side === 'left' ? 'right' : 'left'
+      side: side === "left" ? "right" : "left"
     }));
   }
 
   render() {
-    const { state: {
-      minimized,
-      newMessage,
-      side,
-      store,
-      styleSet,
-      token
-    } } = this;
+    const {
+      state: { minimized, newMessage, side, store, styleSet, token }
+    } = this;
 
     return (
       <div className="minimizable-web-chat">
-        {
-          minimized ?
-            <button
-              className="maximize"
-              onClick={ this.handleMaximizeButtonClick }
-            >
-              <span className={ token ? 'ms-Icon ms-Icon--MessageFill' : 'ms-Icon ms-Icon--Message' } />
-              {
-                newMessage &&
-                  <span className="ms-Icon ms-Icon--CircleShapeSolid red-dot" />
+        {minimized ? (
+          <button className="maximize" onClick={this.handleMaximizeButtonClick}>
+            <span
+              className={
+                token
+                  ? "ms-Icon ms-Icon--MessageFill"
+                  : "ms-Icon ms-Icon--Message"
               }
-            </button>
-          :
-            <div
-              className={ side === 'left' ? 'chat-box left' : 'chat-box right' }
-            >
-              <header>
-                <div className="filler" />
-                <button
-                  className="switch"
-                  onClick={ this.handleSwitchButtonClick }
-                >
-                  <span className="ms-Icon ms-Icon--Switch" />
-                </button>
-                <button
-                  className="minimize"
-                  onClick={ this.handleMinimizeButtonClick }
-                >
-                  <span className="ms-Icon ms-Icon--ChromeMinimize" />
-                </button>
-              </header>
-              <WebChat
-                className="react-web-chat"
-                onFetchToken={ this.handleFetchToken }
-                store={ store }
-                styleSet={ styleSet }
-                token={ token }
-              />
-            </div>
-        }
+            />
+            {newMessage && (
+              <span className="ms-Icon ms-Icon--CircleShapeSolid red-dot" />
+            )}
+          </button>
+        ) : (
+          <div className={side === "left" ? "chat-box left" : "chat-box right"}>
+            <header>
+              <div className="filler" />
+              <button className="switch" onClick={this.handleSwitchButtonClick}>
+                <span className="ms-Icon ms-Icon--Switch" />
+              </button>
+              <button
+                className="minimize"
+                onClick={this.handleMinimizeButtonClick}
+              >
+                <span className="ms-Icon ms-Icon--ChromeMinimize" />
+              </button>
+            </header>
+            <WebChat
+              className="react-web-chat"
+              onFetchToken={this.handleFetchToken}
+              store={store}
+              styleSet={styleSet}
+              token={token}
+            />
+          </div>
+        )}
       </div>
     );
   }

@@ -2,6 +2,8 @@
 <html lang="en-US">
   <head>
     <title>Web Chat: Custom Redux store</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <!--
       For demonstration purposes, we are using the development branch of Web Chat at "/master/webchat.js".
       When you are using Web Chat for production, you should use the latest stable release at "/latest/webchat.js",
@@ -12,8 +14,7 @@
       html, body { height: 100% }
       body { margin: 0 }
 
-      #webchat,
-      #webchat > * {
+      #webchat {
         height: 100%;
         width: 100%;
       }
@@ -31,12 +32,11 @@
         const res = await fetch('https://webchat-mockbot.azurewebsites.net/directline/token', { method: 'POST' });
         const { token } = await res.json();
 
-        // We are creating our own version of Redux store, which include middleware and optional initial state.
+        // We are creating our own version of Redux store, which includes middleware and an optional initial state.
         const store = window.WebChat.createStore(
           {},
           ({ dispatch }) => next => action => {
-            // TODO: [P4] Investigate why we need to wait until DIRECT_LINE/CONNECTION_STATUS_UPDATE, instead of DIRECT_LINE/CONNECT_FULFILLED.
-            if (action.type === 'DIRECT_LINE/CONNECTION_STATUS_UPDATE' && action.payload.connectionStatus === 2) {
+            if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
               // After connected, we will send a message by dispatching a Redux action.
               dispatch({ type: 'WEB_CHAT/SEND_MESSAGE', payload: { text: 'sample:backchannel' } });
             } else if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {

@@ -1,33 +1,26 @@
-import {
-  put,
-  take
-} from 'redux-saga/effects';
-
-import whileConnected from './effects/whileConnected';
+import { put, takeEvery } from 'redux-saga/effects';
 
 import { SEND_MESSAGE } from '../actions/sendMessage';
 import postActivity from '../actions/postActivity';
-import startSpeakingActivity from '../actions/startSpeakingActivity';
-import stopSpeakingActivity from '../actions/stopSpeakingActivity';
+import whileConnected from './effects/whileConnected';
 
-export default function* () {
-  yield whileConnected(function* () {
-    for (;;) {
-      const { payload: { text, via } } = yield take(SEND_MESSAGE);
+function* postActivityWithMessage({ payload: { method, text } }) {
+  yield put(
+    postActivity(
+      {
+        text,
+        textFormat: 'plain',
+        type: 'message'
+      },
+      method
+    )
+  );
+}
 
-      if (text) {
-        yield put(postActivity({
-          text,
-          textFormat: 'plain',
-          type: 'message'
-        }));
+function* sendMessageToPostActivity() {
+  yield takeEvery(({ payload, type }) => type === SEND_MESSAGE && payload.text, postActivityWithMessage);
+}
 
-        if (via === 'speech') {
-          yield put(startSpeakingActivity());
-        } else {
-          yield put(stopSpeakingActivity());
-        }
-      }
-    }
-  });
+export default function* sendMessageToPostActivitySaga() {
+  yield whileConnected(sendMessageToPostActivity);
 }

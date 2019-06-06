@@ -1,28 +1,40 @@
-export default function ({
-  bubbleMaxWidth,
-  bubbleMinWidth,
-  paddingRegular
-}) {
+export default function CarouselFilmStrip({ bubbleMaxWidth, bubbleMinWidth, paddingRegular }) {
   return {
     // Browser quirks: Firefox has no way to hide scrollbar and while keeping it in function
     // https://developer.mozilla.org/en-US/docs/Web/CSS/overflow
-    marginBottom: -17,
-    paddingLeft: paddingRegular,
-    paddingRight: paddingRegular,
-
-    '& > .avatar': {
-      marginRight: paddingRegular
+    '@supports (-moz-appearance: none)': {
+      marginBottom: -17
     },
 
-    '& > .content > ul': {
-      '&:not(:first-child)': {
-        marginTop: paddingRegular
+    '& > .avatar': {
+      marginLeft: paddingRegular
+    },
+
+    '& > .content': {
+      '& > .message': {
+        marginLeft: paddingRegular
       },
 
-      '& > li': {
+      '& > ul': {
+        marginLeft: paddingRegular,
         marginRight: paddingRegular,
-        maxWidth: bubbleMaxWidth,
-        minWidth: bubbleMinWidth
+
+        '&:not(:first-child)': {
+          marginTop: paddingRegular
+        },
+
+        '& > li': {
+          maxWidth: bubbleMaxWidth,
+          minWidth: bubbleMinWidth,
+
+          '&:not(:last-child)': {
+            marginRight: paddingRegular
+          }
+        }
+      },
+
+      '& > .webchat__row': {
+        marginLeft: paddingRegular
       }
     }
   };

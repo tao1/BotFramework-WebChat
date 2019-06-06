@@ -1,38 +1,37 @@
-import {
-  cancel,
-  fork,
-  put,
-  select,
-  take
-} from 'redux-saga/effects';
-
-import whileConnected from './effects/whileConnected';
+import { put, select, takeEvery } from 'redux-saga/effects';
 
 import { MARK_ACTIVITY } from '../actions/markActivity';
-import { START_SPEAKING_ACTIVITY } from '../actions/startSpeakingActivity';
-import { STOP_SPEAKING_ACTIVITY } from '../actions/stopSpeakingActivity';
+import selectActivities from '../selectors/activities';
+import speakingActivity from '../definitions/speakingActivity';
 import startDictate from '../actions/startDictate';
+import whileConnected from './effects/whileConnected';
+import whileSpeakIncomingActivity from './effects/whileSpeakIncomingActivity';
 
-export default function* () {
-  yield whileConnected(function* (_, userID) {
-    for (;;) {
-      yield take(START_SPEAKING_ACTIVITY);
+function* startDictateAfterAllActivitiesSpoken({ payload: { activityID } }) {
+  const activities = yield select(selectActivities);
+  const [spokenActivity] = activities;
 
-      const task = yield fork(startDictateAfterSpeakActivitySaga, userID);
-
-      yield take(STOP_SPEAKING_ACTIVITY);
-      yield cancel(task);
-    }
-  });
+  if (
+    spokenActivity &&
+    spokenActivity.inputHint !== 'ignoringInput' &&
+    // Checks if there are no more activities that will be synthesis
+    !activities.some(activity => activity.id !== activityID && speakingActivity(activity))
+  ) {
+    // We honor input hint based on this article
+    // https://docs.microsoft.com/en-us/azure/bot-service/bot-builder-howto-add-input-hints?view=azure-bot-service-4.0&tabs=cs
+    yield put(startDictate());
+  }
 }
 
-function* startDictateAfterSpeakActivitySaga() {
-  for (;;) {
-    const { payload: { activityID } } = yield take(({ payload, type }) => type === MARK_ACTIVITY && payload.name === 'speak' && payload.value === false);
-    const activities = yield select(({ activities }) => activities);
+function* startDictateAfterSpeakActivity() {
+  yield takeEvery(
+    ({ payload, type }) => type === MARK_ACTIVITY && payload.name === 'speak' && payload.value === false,
+    startDictateAfterAllActivitiesSpoken
+  );
+}
 
-    if (!activities.some(activity => activity.id !== activityID && activity.channelData && activity.channelData.speak === true)) {
-      yield put(startDictate());
-    }
-  }
+export default function* startDictateAfterSpeakActivitySaga() {
+  yield whileConnected(function* startDictateAfterSpeakActivityWhileConnected() {
+    yield whileSpeakIncomingActivity(startDictateAfterSpeakActivity);
+  });
 }

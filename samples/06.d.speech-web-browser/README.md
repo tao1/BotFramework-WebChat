@@ -1,24 +1,24 @@
-# Sample -  Adding Web Browser Speech
+# Sample - Adding Web Browser Speech
 
 A simple web page with a maximized and full-featured Web Chat embed from a CDN, with browser speech added for text-to-speech ability. This sample makes changes that are based off of the [full-bundle CDN sample](./../01.a.getting-started-full-bundle/README.md).
 
 # Test out the hosted sample
 
-- [Try out MockBot](https://microsoft.github.io/BotFramework-WebChat/06.d.speech-web-browser)
+-  [Try out MockBot](https://microsoft.github.io/BotFramework-WebChat/06.d.speech-web-browser)
 
 # How to run locally
 
-- Fork this repository
-- Navigate to `/Your-Local-WebChat/samples/06.d.speech-web-browser` in command line
-- Run `npx serve`
-- Browse to [http://localhost:5000/](http://localhost:5000/)
+-  Fork this repository
+-  Navigate to `/Your-Local-WebChat/samples/06.d.speech-web-browser` in command line
+-  Run `npx serve`
+-  Browse to [http://localhost:5000/](http://localhost:5000/)
 
 # Things to try out
 
-- Use the microphone button: you should be able to provide commands to the bot via speech
-- Speak `help`: you should see a full list of MockBot features
-- Speak `card weather`: you should see a weather card built using Adaptive Cards
-- Speak `carousel`: you should see a carousel of cards
+-  Use the microphone button: you should be able to provide commands to the bot via speech
+-  Speak `help`: you should see a full list of MockBot features
+-  Speak `card weather`: you should see a weather card built using Adaptive Cards
+-  Speak `carousel`: you should see a carousel of cards
 
 # Code
 
@@ -28,7 +28,7 @@ A simple web page with a maximized and full-featured Web Chat embed from a CDN, 
 
 The `index.html` page has one main goal:
 
-- To enable web browser speech to provide speech-to-text ability
+-  To enable web browser speech to provide speech-to-text ability
 
 We'll start by using the [full-bundle CDN sample](./../01.a.getting-started-full-bundle/README.md) as our Web Chat template.
 
@@ -45,7 +45,7 @@ window.WebChat.renderWebChat({
 …
 ```
 
-> If you prefer, you can use your own W3C Web Speech API compliant speech engine. Visit the [W3C Speech API](https://w3c.github.io/speech-api/) documentation for more information, and check out the file [createBrowserWebSpeechPonyfillFactory.js](./../packages\bundle\src\createBrowserWebSpeechPonyfillFactory.js) to reference implementation.
+> If you prefer, you can use your own W3C Web Speech API compliant speech engine. Visit the [W3C Speech API](https://w3c.github.io/speech-api/) documentation for more information, and check out the file [`createBrowserWebSpeechPonyfillFactory.js`](https://github.com/Microsoft/BotFramework-WebChat/blob/master/packages/bundle/src/createBrowserWebSpeechPonyfillFactory.js) to reference implementation.
 
 ## Completed code
 
@@ -61,8 +61,7 @@ Here is the finished `index.html`:
       html, body { height: 100% }
       body { margin: 0 }
 
-      #webchat,
-      #webchat > * {
+      #webchat {
         height: 100%;
         width: 100%;
       }
@@ -90,6 +89,8 @@ Here is the finished `index.html`:
 
 # Further Reading
 
+-  [W3C Web Speech API](https://w3c.github.io/speech-api/)
+
 ## Full list of Web Chat hosted samples
 
-View the list of available samples by clicking [here](https://github.com/Microsoft/BotFramework-WebChat/tree/master/samples)
+View the list of [available Web Chat samples](https://github.com/Microsoft/BotFramework-WebChat/tree/master/samples)

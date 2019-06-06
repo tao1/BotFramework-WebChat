@@ -1,11 +1,20 @@
 export default function createSendBoxStyle({
-  sendBoxHeight
+  sendBoxBackground,
+  sendBoxHeight,
+  sendBoxBorderBottom,
+  sendBoxBorderLeft,
+  sendBoxBorderRight,
+  sendBoxBorderTop
 }) {
   return {
     '& > .main': {
-      backgroundColor: 'White',
-      borderTop: 'solid 1px #E6E6E6',
-      height: sendBoxHeight
+      alignItems: 'stretch',
+      backgroundColor: sendBoxBackground,
+      borderBottom: sendBoxBorderBottom,
+      borderLeft: sendBoxBorderLeft,
+      borderRight: sendBoxBorderRight,
+      borderTop: sendBoxBorderTop,
+      minHeight: sendBoxHeight
     }
   };
 }

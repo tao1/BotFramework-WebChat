@@ -1,49 +1,80 @@
+/* eslint react/no-array-index-key: "off" */
+
 import BasicFilm from 'react-film';
 import classNames from 'classnames';
+import PropTypes from 'prop-types';
 import React from 'react';
 
 import connectToWebChat from '../connectToWebChat';
 import SuggestedAction from './SuggestedAction';
 
-const connectSuggestedActions = (...selectors) => connectToWebChat(
-  ({
-    language,
-    suggestedActions
-  }) => ({
-    language,
-    suggestedActions
-  }),
-  ...selectors
-)
+function suggestedActionText({ displayText, title, type, value }) {
+  if (type === 'messageBack') {
+    return title || displayText;
+  } else if (title) {
+    return title;
+  } else if (typeof value === 'string') {
+    return value;
+  }
 
-export default connectSuggestedActions(
-  ({ styleSet }) => ({ styleSet })
-)(({
-  className,
-  styleSet,
-  suggestedActions
-}) =>
-  !!suggestedActions.length &&
+  return JSON.stringify(value);
+}
+
+const connectSuggestedActions = (...selectors) =>
+  connectToWebChat(
+    ({ language, suggestedActions }) => ({
+      language,
+      suggestedActions
+    }),
+    ...selectors
+  );
+
+const SuggestedActions = ({ className, styleSet, suggestedActions = [] }) =>
+  !!suggestedActions.length && (
     <BasicFilm
-      autoCenter={ false }
-      className={ classNames(
-        styleSet.suggestedActions + '',
-        className
-      ) }
-      showDots={ false }
-      styleSet={ styleSet.options.suggestedActionsStyleSet }
+      autoCenter={false}
+      className={classNames(styleSet.suggestedActions + '', className + '')}
+      showDots={false}
+      styleSet={styleSet.options.suggestedActionsStyleSet}
     >
-      {
-        suggestedActions.map((suggestedAction, index) =>
-          <SuggestedAction
-            key={ index }
-            text={ suggestedAction.title || suggestedAction.value }
-            type={ suggestedAction.type }
-            value={ suggestedAction.value }
-          />
-        )
-      }
+      {suggestedActions.map(({ displayText, image, text, title, type, value }, index) => (
+        <SuggestedAction
+          buttonText={suggestedActionText({ displayText, title, type, value })}
+          displayText={displayText}
+          image={image}
+          key={index}
+          text={text}
+          type={type}
+          value={value}
+        />
+      ))}
     </BasicFilm>
-)
+  );
 
-export { connectSuggestedActions }
+SuggestedActions.defaultProps = {
+  className: ''
+};
+
+SuggestedActions.propTypes = {
+  className: PropTypes.string,
+  styleSet: PropTypes.shape({
+    options: PropTypes.shape({
+      suggestedActionsStyleSet: PropTypes.any.isRequired
+    }).isRequired,
+    suggestedActions: PropTypes.any.isRequired
+  }).isRequired,
+  suggestedActions: PropTypes.arrayOf(
+    PropTypes.shape({
+      displayText: PropTypes.string,
+      image: PropTypes.string,
+      text: PropTypes.string,
+      title: PropTypes.string,
+      type: PropTypes.string.isRequired,
+      value: PropTypes.any
+    })
+  ).isRequired
+};
+
+export default connectSuggestedActions(({ styleSet }) => ({ styleSet }))(SuggestedActions);
+
+export { connectSuggestedActions };

@@ -15,15 +15,17 @@ import {
   disconnect,
   markActivity,
   postActivity,
+  sendEvent,
   sendFiles,
   sendMessage,
+  sendMessageBack,
   sendPostBack,
   setDictateInterims,
   setDictateState,
   setLanguage,
   setSendBox,
   setSendTimeout,
-  setSendTyping,
+  setSendTypingIndicator,
   startDictate,
   startSpeakingActivity,
   stopDictate,
@@ -31,11 +33,13 @@ import {
   submitSendBox
 } from 'botframework-webchat-core';
 
+import concatMiddleware from './Middleware/concatMiddleware';
 import Context from './Context';
+import createCoreCardActionMiddleware from './Middleware/CardAction/createCoreMiddleware';
 import createStyleSet from './Styles/createStyleSet';
-import defaultAdaptiveCardHostConfig from './Styles/adaptiveCardHostConfig';
 import Dictation from './Dictation';
 import mapMap from './Utils/mapMap';
+import observableToPromise from './Utils/observableToPromise';
 import shallowEquals from './Utils/shallowEquals';
 
 // Flywheel object
@@ -44,8 +48,10 @@ const EMPTY_ARRAY = [];
 const DISPATCHERS = {
   markActivity,
   postActivity,
+  sendEvent,
   sendFiles,
   sendMessage,
+  sendMessageBack,
   sendPostBack,
   setDictateInterims,
   setDictateState,
@@ -59,68 +65,37 @@ const DISPATCHERS = {
 };
 
 function styleSetToClassNames(styleSet) {
-  return mapMap(styleSet, (style, key) => key === 'options' ? style : css(style));
+  return mapMap(styleSet, (style, key) => (key === 'options' ? style : css(style)));
 }
 
-function createCardActionLogic({ directLine, dispatch }) {
+function createCardActionLogic({ cardActionMiddleware, directLine, dispatch }) {
+  const runMiddleware = concatMiddleware(cardActionMiddleware, createCoreCardActionMiddleware())({ dispatch });
+
   return {
-    onCardAction: (({ type, value }) => {
-      switch (type) {
-        case 'imBack':
-          if (typeof value === 'string') {
-            // TODO: [P4] Instead of calling dispatch, we should move to dispatchers instead for completeness
-            dispatch(sendMessage(value, 'imBack'));
-          } else {
-            throw new Error('cannot send "imBack" with a non-string value');
-          }
+    onCardAction: cardAction =>
+      runMiddleware(({ cardAction: { type } }) => {
+        throw new Error(`Web Chat: received unknown card action "${type}"`);
+      })({
+        cardAction,
+        getSignInUrl:
+          cardAction.type === 'signin'
+            ? () => {
+                const { value } = cardAction;
 
-          break;
+                if (directLine.getSessionId) {
+                  // TODO: [P3] We should change this one to async/await.
+                  //       This is the first place in this project to use async.
+                  //       Thus, we need to add @babel/plugin-transform-runtime and @babel/runtime.
 
-        case 'postBack':
-          dispatch(sendPostBack(value));
+                  return observableToPromise(directLine.getSessionId()).then(
+                    sessionId => `${value}${encodeURIComponent(`&code_challenge=${sessionId}`)}`
+                  );
+                }
 
-          break;
-
-        case 'call':
-        case 'downloadFile':
-        case 'openUrl':
-        case 'playAudio':
-        case 'playVideo':
-        case 'showImage':
-          // TODO: [P3] We should support ponyfill for window.open
-          //       This is as-of v3
-          window.open(value);
-          break;
-
-        case 'signin':
-          // TODO: [P3] We should prime the URL into the OAuthCard directly, instead of calling getSessionId on-demand
-          //       This is to eliminate the delay between window.open() and location.href call
-
-          const popup = window.open();
-
-          if (directLine.getSessionId)  {
-            const subscription = directLine.getSessionId().subscribe(sessionId => {
-              popup.location.href = `${ value }${ encodeURIComponent(`&code_challenge=${ sessionId }`) }`;
-
-              // HACK: Sometimes, the call complete asynchronously and we cannot unsubscribe
-              //       Need to wait some short time here to make sure the subscription variable has setup
-              setImmediate(() => subscription.unsubscribe());
-            }, error => {
-              // TODO: [P3] Let the user know something failed and we cannot proceed
-              //       This is as-of v3 now
-              console.error(error);
-            });
-          } else {
-            popup.location.href = value;
-          }
-
-          break;
-
-        default:
-          console.error(`Web Chat: received unknown card action "${ type }"`);
-          break;
-      }
-    })
+                return value;
+              }
+            : null
+      })
   };
 }
 
@@ -149,13 +124,17 @@ function patchPropsForAvatarInitials({ botAvatarInitials, userAvatarInitials, ..
   if (botAvatarInitials) {
     styleOptions = { ...styleOptions, botAvatarInitials };
 
-    console.warn('Web Chat: "botAvatarInitials" is deprecated. Please use "styleOptions.botAvatarInitials" instead.');
+    console.warn(
+      'Web Chat: "botAvatarInitials" is deprecated. Please use "styleOptions.botAvatarInitials" instead. "botAvatarInitials" will be removed on or after December 11 2019 .'
+    );
   }
 
   if (userAvatarInitials) {
     styleOptions = { ...styleOptions, userAvatarInitials };
 
-    console.warn('Web Chat: "userAvatarInitials" is deprecated. Please use "styleOptions.userAvatarInitials" instead.');
+    console.warn(
+      'Web Chat: "botAvatarInitials" is deprecated. Please use "styleOptions.botAvatarInitials" instead. "botAvatarInitials" will be removed on or after December 11 2019 .'
+    );
   }
 
   return {
@@ -186,81 +165,86 @@ function createLogic(props) {
   };
 }
 
+function dispatchSetLanguageFromProps({ dispatch, locale }) {
+  dispatch(setLanguage(locale));
+}
+
+function dispatchSetSendTimeoutFromProps({ dispatch, sendTimeout }) {
+  dispatch(setSendTimeout(sendTimeout));
+}
+
+function dispatchSetSendTypingIndicatorFromProps({ dispatch, sendTyping, sendTypingIndicator }) {
+  if (typeof sendTyping === 'undefined') {
+    dispatch(setSendTypingIndicator(!!sendTypingIndicator));
+  } else {
+    // TODO: [P3] Take this deprecation code out when releasing on or after January 13 2020
+    console.warn(
+      'Web Chat: "sendTyping" has been renamed to "sendTypingIndicator". Please use "sendTypingIndicator" instead. This deprecation migration will be removed on or after January 13 2020.'
+    );
+    dispatch(setSendTypingIndicator(!!sendTyping));
+  }
+}
+
 class Composer extends React.Component {
   constructor(props) {
     super(props);
 
-    this.createContextFromProps = memoize(
-      createLogic,
-      shallowEquals
+    this.createContextFromProps = memoize(createLogic, shallowEquals);
+
+    this.createWebSpeechPonyfill = memoize(
+      (webSpeechPonyfillFactory, referenceGrammarID) =>
+        webSpeechPonyfillFactory && webSpeechPonyfillFactory({ referenceGrammarID })
     );
 
-    this.createWebSpeechPonyfill = memoize((webSpeechPonyfillFactory, referenceGrammarID) => webSpeechPonyfillFactory && webSpeechPonyfillFactory({ referenceGrammarID }));
-
-    this.mergeContext = memoize(
-      (...contexts) => Object.assign({}, ...contexts),
-      shallowEquals
-    );
+    this.mergeContext = memoize((...contexts) => Object.assign({}, ...contexts), shallowEquals);
 
     this.state = {
-      hoistedDispatchers: mapMap(DISPATCHERS, dispatcher => (...args) => this.props.dispatch(dispatcher.apply(this, args)))
+      hoistedDispatchers: mapMap(DISPATCHERS, dispatcher => (...args) => props.dispatch(dispatcher.apply(this, args)))
     };
   }
 
   componentWillMount() {
     const { props } = this;
-    const { directLine, userID } = props;
+    const { directLine, userID, username } = props;
 
-    this.setLanguageFromProps(props);
-    this.setSendTimeoutFromProps(props);
-    this.setSendTypingFromProps(props);
+    dispatchSetLanguageFromProps(props);
+    dispatchSetSendTimeoutFromProps(props);
+    dispatchSetSendTypingIndicatorFromProps(props);
 
-    props.dispatch(createConnectAction({ directLine, userID }));
+    props.dispatch(createConnectAction({ directLine, userID, username }));
   }
 
   componentDidUpdate(prevProps) {
     const { props } = this;
-    const { directLine, locale, sendTimeout, sendTyping, userID } = props;
+    const { directLine, locale, sendTimeout, sendTyping, sendTypingIndicator, userID, username } = props;
 
     if (prevProps.locale !== locale) {
-      this.setLanguageFromProps(props);
+      dispatchSetLanguageFromProps(props);
     }
 
     if (prevProps.sendTimeout !== sendTimeout) {
-      this.setSendTimeoutFromProps(props);
-    }
-
-    if (!prevProps.sendTyping !== !sendTyping) {
-      this.setSendTypingFromProps(props);
+      dispatchSetSendTimeoutFromProps(props);
     }
 
     if (
-      prevProps.directLine !== directLine
-      || prevProps.userID !== userID
+      !prevProps.sendTypingIndicator !== !sendTypingIndicator ||
+      // TODO: [P3] Take this deprecation code out when releasing on or after January 13 2020
+      !prevProps.sendTyping !== !sendTyping
     ) {
+      dispatchSetSendTypingIndicatorFromProps(props);
+    }
+
+    if (prevProps.directLine !== directLine || prevProps.userID !== userID || prevProps.username !== username) {
       // TODO: [P3] disconnect() is an async call (pending -> fulfilled), we need to wait, or change it to reconnect()
       props.dispatch(disconnect());
-      props.dispatch(createConnectAction({ directLine, userID }));
+      props.dispatch(createConnectAction({ directLine, userID, username }));
     }
-  }
-
-  setLanguageFromProps(props) {
-    props.dispatch(setLanguage(props.locale || window.navigator.language || 'en-US'));
-  }
-
-  setSendTimeoutFromProps(props) {
-    props.dispatch(setSendTimeout(props.sendTimeout || 20000));
-  }
-
-  setSendTypingFromProps(props) {
-    props.dispatch(setSendTyping(!!props.sendTyping));
   }
 
   render() {
     const {
       props: {
         activityRenderer,
-        adaptiveCardHostConfig,
         attachmentRenderer,
         children,
 
@@ -273,7 +257,8 @@ class Composer extends React.Component {
         renderMarkdown,
         scrollToEnd,
         store,
-        userID,
+        userID: _userID, // Ignoring eslint no-unused-vars: we just want to remove userID and username from propsForLogic
+        username: _username, // Ignoring eslint no-unused-vars: we just want to remove userID and username from propsForLogic
         webSpeechPonyfillFactory,
         ...propsForLogic
       },
@@ -290,9 +275,7 @@ class Composer extends React.Component {
       //       If we let it thru, the code below become simplified and the user can plug in whatever they want for context, via Composer.props
       {
         activityRenderer,
-        adaptiveCardHostConfig: adaptiveCardHostConfig || defaultAdaptiveCardHostConfig(this.props.styleOptions),
         attachmentRenderer,
-
         groupTimestamp,
         disabled,
         grammars: grammars || EMPTY_ARRAY,
@@ -306,28 +289,21 @@ class Composer extends React.Component {
     // TODO: [P3] Check how many times we do re-render context
 
     return (
-      <Context.Provider value={ context }>
-        { typeof children === 'function' ? children(context) : children }
+      <Context.Provider value={context}>
+        {typeof children === 'function' ? children(context) : children}
         <Dictation />
       </Context.Provider>
     );
   }
 }
 
-const ConnectedComposer = connect(
-  ({ referenceGrammarID }) => ({ referenceGrammarID })
-)(props =>
-  <ScrollToBottomComposer threshold={ 40 }>
+const ConnectedComposer = connect(({ referenceGrammarID }) => ({ referenceGrammarID }))(props => (
+  <ScrollToBottomComposer>
     <ScrollToBottomFunctionContext.Consumer>
-      { ({ scrollToEnd }) =>
-        <Composer
-          scrollToEnd={ scrollToEnd }
-          { ...props }
-        />
-      }
+      {({ scrollToEnd }) => <Composer scrollToEnd={scrollToEnd} {...props} />}
     </ScrollToBottomFunctionContext.Consumer>
   </ScrollToBottomComposer>
-);
+));
 
 // We will create a Redux store if it was not passed in
 class ConnectedComposerWithStore extends React.Component {
@@ -340,34 +316,72 @@ class ConnectedComposerWithStore extends React.Component {
   render() {
     const { props } = this;
 
-    return (
-      <ConnectedComposer
-        { ...props }
-        store={ props.store || this.createMemoizedStore() }
-      />
-    );
+    return <ConnectedComposer {...props} store={props.store || this.createMemoizedStore()} />;
   }
 }
 
-export default ConnectedComposerWithStore
+export default ConnectedComposerWithStore;
 
 // TODO: [P3] We should consider moving some props to Redux store
 //       Although we use `connectToWebChat` to hide the details of accessor of Redux store,
 //       we should clean up the responsibility between Context and Redux store
 //       We should decide which data is needed for React but not in other environment such as CLI/VSCode
-ConnectedComposerWithStore.propTypes = {
+
+Composer.defaultProps = {
+  activityRenderer: undefined,
+  adaptiveCardHostConfig: undefined,
+  attachmentRenderer: undefined,
+  cardActionMiddleware: undefined,
+  children: undefined,
+  disabled: false,
+  grammars: [],
+  groupTimestamp: true,
+  locale: window.navigator.language || 'en-US',
+  referenceGrammarID: '',
+  renderMarkdown: text => text,
+  sendTimeout: 20000,
+  sendTyping: undefined,
+  sendTypingIndicator: false,
+  store: undefined,
+  styleOptions: {},
+  userID: '',
+  username: '',
+  webSpeechPonyfillFactory: undefined
+};
+
+Composer.propTypes = {
   activityRenderer: PropTypes.func,
   adaptiveCardHostConfig: PropTypes.any,
   attachmentRenderer: PropTypes.func,
-  groupTimestamp: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
+  cardActionMiddleware: PropTypes.func,
+  children: PropTypes.any,
+  directLine: PropTypes.shape({
+    activity$: PropTypes.shape({
+      subscribe: PropTypes.func.isRequired
+    }).isRequired,
+    connectionStatus$: PropTypes.shape({
+      subscribe: PropTypes.func.isRequired
+    }).isRequired,
+    end: PropTypes.func,
+    getSessionId: PropTypes.func.isRequired,
+    postActivity: PropTypes.func.isRequired,
+    referenceGrammarID: PropTypes.string,
+    token: PropTypes.string
+  }).isRequired,
   disabled: PropTypes.bool,
+  dispatch: PropTypes.func.isRequired,
   grammars: PropTypes.arrayOf(PropTypes.string),
+  groupTimestamp: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
+  locale: PropTypes.string,
   referenceGrammarID: PropTypes.string,
   renderMarkdown: PropTypes.func,
-  scrollToBottom: PropTypes.func,
+  scrollToEnd: PropTypes.func.isRequired,
   sendTimeout: PropTypes.number,
   sendTyping: PropTypes.bool,
+  sendTypingIndicator: PropTypes.bool,
   store: PropTypes.any,
+  styleOptions: PropTypes.any,
   userID: PropTypes.string,
+  username: PropTypes.string,
   webSpeechPonyfillFactory: PropTypes.func
 };

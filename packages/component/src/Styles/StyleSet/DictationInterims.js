@@ -1,10 +1,6 @@
-import { primaryFont } from '../Fonts';
-
-export default function createDictationInterimsStyle({
-  paddingRegular
-}) {
+export default function createDictationInterimsStyle({ paddingRegular, primaryFont }) {
   return {
-    ...primaryFont,
+    fontFamily: primaryFont,
     margin: 0,
     paddingBottom: 0,
     paddingLeft: paddingRegular,
@@ -12,7 +8,7 @@ export default function createDictationInterimsStyle({
     paddingTop: 0,
 
     '&.dictating > span:not(:first-child), &.status': {
-      opacity: .5
+      opacity: 0.5
     }
   };
 }

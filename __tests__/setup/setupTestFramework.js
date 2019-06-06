@@ -1,16 +1,41 @@
 import { Builder } from 'selenium-webdriver';
+import { configureToMatchImageSnapshot } from 'jest-image-snapshot';
 import { createServer } from 'http';
 import { join } from 'path';
 import { promisify } from 'util';
-import { configureToMatchImageSnapshot } from 'jest-image-snapshot';
 import getPort from 'get-port';
 import handler from 'serve-handler';
 
+import createPageObjects from './pageObjects/index';
+import retry from './retry';
 import setupTestEnvironment from './setupTestEnvironment';
 
 const BROWSER_NAME = process.env.WEBCHAT_TEST_ENV || 'chrome-docker';
 // const BROWSER_NAME = 'chrome-docker';
 // const BROWSER_NAME = 'chrome-local';
+
+function marshal(props) {
+  return (
+    props &&
+    Object.keys(props).reduce(
+      (nextProps, key) => {
+        const { [key]: value } = props;
+
+        if (typeof value === 'function') {
+          nextProps[key] = `() => ${value.toString()}`;
+          nextProps.__evalKeys.push(key);
+        } else {
+          nextProps[key] = value;
+        }
+
+        return nextProps;
+      },
+      {
+        __evalKeys: []
+      }
+    )
+  );
+}
 
 expect.extend({
   toMatchImageSnapshot: configureToMatchImageSnapshot({
@@ -21,23 +46,58 @@ expect.extend({
 let driverPromise;
 let serverPromise;
 
-global.setupWebDriver = async () => {
+const DEFAULT_OPTIONS = {
+  pingBotOnLoad: true
+};
+
+global.setupWebDriver = async options => {
+  options = { ...DEFAULT_OPTIONS, ...options };
+
   if (!driverPromise) {
-    driverPromise = (async () => {
-      let { baseURL, builder } = await setupTestEnvironment(BROWSER_NAME, new Builder());
+    driverPromise = retry(async () => {
+      let { baseURL, builder } = await setupTestEnvironment(BROWSER_NAME, new Builder(), options);
       const driver = builder.build();
 
-      // If the baseURL contains $PORT, it means it requires us to fill-in
-      if (/\$PORT/i.test(baseURL)) {
-        const { port } = await global.setupWebServer();
+      try {
+        // If the baseURL contains $PORT, it means it requires us to fill-in
+        if (/\$PORT/i.test(baseURL)) {
+          const { port } = await global.setupWebServer();
 
-        await driver.get(baseURL.replace(/\$PORT/ig, port));
-      } else {
-        await driver.get(baseURL);
+          await driver.get(baseURL.replace(/\$PORT/gi, port));
+        } else {
+          await driver.get(baseURL);
+        }
+
+        await driver.executeAsyncScript(
+          (coverage, options, callback) => {
+            window.__coverage__ = coverage;
+
+            main(options).then(
+              () => callback(),
+              err => {
+                console.error(err);
+                callback(err);
+              }
+            );
+          },
+          global.__coverage__,
+          marshal({
+            ...options,
+            props: marshal(options.props)
+          })
+        );
+
+        const pageObjects = createPageObjects(driver);
+
+        options.pingBotOnLoad && (await pageObjects.pingBot());
+
+        return { driver, pageObjects };
+      } catch (err) {
+        await driver.quit();
+
+        throw err;
       }
-
-      return { driver };
-    })();
+    }, 3);
   }
 
   return await driverPromise;
@@ -47,20 +107,23 @@ global.setupWebServer = async () => {
   if (!serverPromise) {
     serverPromise = new Promise(async (resolve, reject) => {
       const port = await getPort();
-      const httpServer = createServer((req, res) => handler(req, res, {
-        redirects: [
-          { source: '/', destination: '__tests__/setup/web/index.html' }
-        ],
-        rewrites: [
-          { source: '/webchat.js', destination: 'packages/bundle/dist/webchat.js' },
-          { source: '/webchat-es5.js', destination: 'packages/bundle/dist/webchat-es5.js' },
-          { source: '/webchat-instrumented.js', destination: 'packages/bundle/dist/webchat-instrumented.js' },
-          { source: '/webchat-instrumented-es5.js', destination: 'packages/bundle/dist/webchat-instrumented-es5.js' },
-          { source: '/webchat-instrumented-minimal.js', destination: 'packages/bundle/dist/webchat-instrumented-minimal.js' },
-          { source: '/webchat-minimal.js', destination: 'packages/bundle/dist/webchat-minimal.js' }
-        ],
-        public: join(__dirname, '../..'),
-      }));
+      const httpServer = createServer((req, res) =>
+        handler(req, res, {
+          redirects: [{ source: '/', destination: '__tests__/setup/web/index.html' }],
+          rewrites: [
+            { source: '/webchat.js', destination: 'packages/bundle/dist/webchat.js' },
+            { source: '/webchat-es5.js', destination: 'packages/bundle/dist/webchat-es5.js' },
+            { source: '/webchat-instrumented.js', destination: 'packages/bundle/dist/webchat-instrumented.js' },
+            { source: '/webchat-instrumented-es5.js', destination: 'packages/bundle/dist/webchat-instrumented-es5.js' },
+            {
+              source: '/webchat-instrumented-minimal.js',
+              destination: 'packages/bundle/dist/webchat-instrumented-minimal.js'
+            },
+            { source: '/webchat-minimal.js', destination: 'packages/bundle/dist/webchat-minimal.js' }
+          ],
+          public: join(__dirname, '../..')
+        })
+      );
 
       httpServer.once('error', reject);
 
@@ -74,7 +137,7 @@ global.setupWebServer = async () => {
   }
 
   return await serverPromise;
-}
+};
 
 afterEach(async () => {
   if (driverPromise) {
@@ -84,12 +147,13 @@ afterEach(async () => {
       global.__coverage__ = await driver.executeScript(() => window.__coverage__);
 
       ((await driver.executeScript(() => window.__console__)) || [])
-        .filter(([type]) => type !== 'info' && type !== 'log')
+        .filter(([type]) => type === 'error' && type === 'warn')
         .forEach(([type, message]) => {
-          console.log(`${ type }: ${ message }`);
+          console.log(`${type}: ${message}`);
         });
     } finally {
       await driver.quit();
+      driverPromise = null;
     }
   }
 });

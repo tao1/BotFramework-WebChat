@@ -1,18 +1,17 @@
-import {
-  put
-} from 'redux-saga/effects';
-
-import observeEach from './effects/observeEach';
-import whileConnected from './effects/whileConnected';
+import { put } from 'redux-saga/effects';
 
 import connectionStatusUpdate from '../actions/connectionStatusUpdate';
+import observeEach from './effects/observeEach';
 import setReferenceGrammarID from '../actions/setReferenceGrammarID';
+import whileConnected from './effects/whileConnected';
 
-export default function* () {
-  yield whileConnected(function* (directLine) {
-    yield observeEach(directLine.connectionStatus$, function* (connectionStatus) {
-      yield put(connectionStatusUpdate(connectionStatus));
-      yield put(setReferenceGrammarID(directLine.referenceGrammarId));
-    });
+function* observeConnectionStatus({ directLine }) {
+  yield observeEach(directLine.connectionStatus$, function* updateConnectionStatus(connectionStatus) {
+    yield put(connectionStatusUpdate(connectionStatus));
+    yield put(setReferenceGrammarID(directLine.referenceGrammarId));
   });
+}
+
+export default function* connectionStatusUpdateSaga() {
+  yield whileConnected(observeConnectionStatus);
 }

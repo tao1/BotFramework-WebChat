@@ -1,6 +1,6 @@
 {
   "name": "botframework-webchat-root",
-  "version": "4.2.1-0",
+  "version": "4.4.2-0",
   "private": true,
   "files": [
     "lib/**/*"
@@ -15,18 +15,58 @@
     "url": "https://github.com/Microsoft/BotFramework-WebChat/issues"
   },
   "homepage": "https://github.com/Microsoft/BotFramework-WebChat#readme",
-  "keywords": [],
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
   "jest": {
     "collectCoverage": true,
+    "collectCoverageFrom": [
+      "**/packages/**/src/**/*.{js,jsx,ts,tsx}",
+      "!**/*.{spec,test}.{js,jsx,ts,tsx}",
+      "!**/*.json",
+      "!**/node_modules/**",
+      "!**/packages/playground/**"
+    ],
     "coverageReporters": [
       "lcov",
       "text-summary"
     ],
-    "setupTestFrameworkScriptFile": "<rootDir>/__tests__/setup/setupTestFramework.js",
-    "testPathIgnorePatterns": [
-      "<rootDir>/__tests__/setup/"
+    "moduleDirectories": [
+      "node_modules",
+      "packages"
     ],
-    "testRegex": "(/__tests__/.*)\\.jsx?$"
+    "moduleFileExtensions": [
+      "js",
+      "jsx",
+      "ts",
+      "tsx"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/__tests__/setup/setupTestFramework.js"
+    ],
+    "testPathIgnorePatterns": [
+      "<rootDir>/__tests__/setup/",
+      "<rootDir>/packages/playground/",
+      "<rootDir>/samples/"
+    ],
+    "transform": {
+      "\\.[jt]sx?$": "./babel-jest-config.js"
+    }
+  },
+  "keywords": [],
+  "lint-staged": {
+    "linters": {
+      "*.{js,jsx,md,ts,tsx}": [
+        "prettier --write packages/{bundle,component,core,embed,playground}/src/**/*.{js,jsx,ts,tsx}",
+        "prettier --write __tests__/**/*.{js,jsx,ts,tsx}",
+        "git add"
+      ]
+    },
+    "ignore": [
+      "**/**/*.md"
+    ]
   },
   "scripts": {
     "bootstrap": "lerna bootstrap",
@@ -34,25 +74,38 @@
     "build:sample": "lerna run --scope=sample-* --stream build",
     "clean": "lerna run --scope=botframework-webchat* --parallel --stream clean",
     "coveralls": "cat ./coverage/lcov.info | coveralls",
+    "eslint": "lerna run --scope=botframework-webchat* --parallel --stream eslint",
     "lerna-publish": "lerna publish",
     "prepublishOnly": "lerna run --scope=botframework-webchat* --scope=playground --stream prepublishOnly",
-    "test": "jest",
+    "prettier-readmes": "prettier --write **/**/*.md --tab-width 3 --single-quote true",
+    "test": "jest --no-cache",
     "test:all": "lerna run --parallel --stream test",
     "watch": "lerna run --parallel --scope=botframework-webchat* --stream watch"
   },
   "devDependencies": {
-    "@babel/cli": "^7.1.2",
-    "@babel/core": "^7.1.2",
-    "@babel/plugin-proposal-object-rest-spread": "^7.0.0",
-    "@babel/preset-env": "^7.1.0",
+    "@azure/storage-blob": "^10.3.0",
+    "@babel/cli": "^7.4.3",
+    "@babel/core": "^7.4.3",
+    "@babel/plugin-proposal-class-properties": "^7.4.0",
+    "@babel/plugin-proposal-object-rest-spread": "^7.4.3",
+    "@babel/plugin-transform-runtime": "^7.4.3",
+    "@babel/preset-env": "^7.4.3",
     "@babel/preset-react": "^7.0.0",
-    "babel-core": "^7.0.0-bridge.0",
+    "@babel/preset-typescript": "^7.3.3",
+    "@babel/runtime": "^7.4.3",
+    "babel-jest": "^24.1.0",
     "coveralls": "^3.0.2",
     "get-port": "^4.0.0",
-    "jest": "^23.6.0",
-    "jest-image-snapshot": "^2.6.0",
-    "lerna": "^3.4.0",
+    "husky": "^2.3.0",
+    "jest": "^24.1.0",
+    "jest-image-snapshot": "^2.8.1",
+    "lerna": "^3.14.0",
+    "lint-staged": "^8.1.7",
     "selenium-webdriver": "^4.0.0-alpha.1",
     "serve-handler": "^5.0.5"
+  },
+  "dependencies": {
+    "@types/react": "^16.8.19",
+    "react-is": "^16.8.6"
   }
 }

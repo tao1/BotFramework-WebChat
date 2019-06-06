@@ -1,21 +1,14 @@
-import {
-  all,
-  call,
-  cancelled,
-  fork,
-  put,
-  race,
-  select,
-  take
-} from 'redux-saga/effects';
-
-import sleep from '../utils/sleep';
+import { all, call, cancelled, put, race, select, take, takeEvery } from 'redux-saga/effects';
 
 import observeOnce from './effects/observeOnce';
 import whileConnected from './effects/whileConnected';
 
+import languageSelector from '../selectors/language';
+import sendTimeoutSelector from '../selectors/sendTimeout';
+
 import deleteKey from '../utils/deleteKey';
 import getTimestamp from '../utils/getTimestamp';
+import sleep from '../utils/sleep';
 import uniqueID from '../utils/uniqueID';
 
 import {
@@ -27,27 +20,19 @@ import {
 
 import { INCOMING_ACTIVITY } from '../actions/incomingActivity';
 
-export default function* () {
-  yield whileConnected(function* (directLine, userID) {
-    for (let numActivitiesPosted = 0;; numActivitiesPosted++) {
-      const action = yield take(POST_ACTIVITY);
-
-      yield fork(postActivity, directLine, userID, numActivitiesPosted, action);
-    }
-  });
-}
-
-function* postActivity(directLine, userID, numActivitiesPosted, { payload: { activity } }) {
-  const locale = yield select(({ language }) => language);
+function* postActivity(directLine, userID, username, numActivitiesPosted, { meta: { method }, payload: { activity } }) {
+  const locale = yield select(languageSelector);
   const { attachments, channelData: { clientActivityID = uniqueID() } = {} } = activity;
 
   activity = {
     ...deleteKey(activity, 'id'),
-    attachments: attachments && attachments.map(({ contentType, contentUrl, name }) => ({
-      contentType,
-      contentUrl,
-      name
-    })),
+    attachments:
+      attachments &&
+      attachments.map(({ contentType, contentUrl, name }) => ({
+        contentType,
+        contentUrl,
+        name
+      })),
     channelData: {
       clientActivityID,
       ...deleteKey(activity.channelData, 'state')
@@ -55,6 +40,7 @@ function* postActivity(directLine, userID, numActivitiesPosted, { payload: { act
     channelId: 'webchat',
     from: {
       id: userID,
+      name: username,
       role: 'user'
     },
     locale,
@@ -62,27 +48,32 @@ function* postActivity(directLine, userID, numActivitiesPosted, { payload: { act
   };
 
   if (!numActivitiesPosted) {
-    activity.entities = [...activity.entities || [], {
-      // TODO: [P4] Currently in v3, we send the capabilities although the client might not actually have them
-      //       We need to understand why we need to send these, and only send capabilities the client have
-      requiresBotState: true,
-      supportsListening: true,
-      supportsTts: true,
-      type: 'ClientCapabilities'
-    }];
+    activity.entities = [
+      ...(activity.entities || []),
+      {
+        // TODO: [P4] Currently in v3, we send the capabilities although the client might not actually have them
+        //       We need to understand why we need to send these, and only send capabilities the client have
+        requiresBotState: true,
+        supportsListening: true,
+        supportsTts: true,
+        type: 'ClientCapabilities'
+      }
+    ];
   }
 
-  const meta = { clientActivityID };
+  const meta = { clientActivityID, method };
 
-  yield put({ type: POST_ACTIVITY_PENDING, payload: { activity }, meta });
+  yield put({ type: POST_ACTIVITY_PENDING, meta, payload: { activity } });
 
   try {
     // Quirks: We might receive INCOMING_ACTIVITY before the postActivity call completed
     //         So, we setup expectation first, then postActivity afterward
 
-    const echoBackCall = call(function* () {
+    const echoBackCall = call(function*() {
       for (;;) {
-        const { payload: { activity } } = yield take(INCOMING_ACTIVITY);
+        const {
+          payload: { activity }
+        } = yield take(INCOMING_ACTIVITY);
         const { channelData = {}, id } = activity;
 
         if (channelData.clientActivityID === clientActivityID && id) {
@@ -96,9 +87,11 @@ function* postActivity(directLine, userID, numActivitiesPosted, { payload: { act
     //   - Direct Line service only respond on HTTP after bot respond to Direct Line
     // - Activity may take too long time to echo back
 
-    const sendTimeout = yield select(({ sendTimeout }) => sendTimeout);
+    const sendTimeout = yield select(sendTimeoutSelector);
 
-    const { send: { echoBack } } = yield race({
+    const {
+      send: { echoBack }
+    } = yield race({
       send: all({
         echoBack: echoBackCall,
         postActivity: observeOnce(directLine.postActivity(activity))
@@ -114,4 +107,14 @@ function* postActivity(directLine, userID, numActivitiesPosted, { payload: { act
       yield put({ type: POST_ACTIVITY_REJECTED, error: true, meta, payload: new Error('cancelled') });
     }
   }
+}
+
+export default function* postActivitySaga() {
+  yield whileConnected(function* postActivityWhileConnected({ directLine, userID, username }) {
+    let numActivitiesPosted = 0;
+
+    yield takeEvery(POST_ACTIVITY, function* postActivityWrapper(action) {
+      yield* postActivity(directLine, userID, username, numActivitiesPosted++, action);
+    });
+  });
 }

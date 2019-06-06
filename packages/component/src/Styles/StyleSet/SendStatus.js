@@ -1,15 +1,8 @@
-import {
-  primarySmallFont
-} from '../Fonts';
-
-export default function createSendStatusStyle({
-  accent,
-  timestampColor
-}) {
+export default function createSendStatusStyle({ accent, fontSizeSmall, primaryFont, timestampColor }) {
   return {
-    ...primarySmallFont,
-
     color: timestampColor,
+    fontFamily: primaryFont,
+    fontSize: fontSizeSmall,
     paddingTop: 5,
 
     '& > button': {

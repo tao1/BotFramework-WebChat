@@ -1,16 +1,11 @@
-import { primaryFont } from '../Fonts';
-
-export default function ({
-  accent,
-  bubbleTextColor,
-  paddingRegular
-}) {
+export default function createDownloadAttachmentStyle({ accent, bubbleTextColor, paddingRegular, primaryFont }) {
   return {
-    ...primaryFont,
+    fontFamily: primaryFont,
 
     '& > a': {
       alignItems: 'center',
       color: bubbleTextColor,
+      // TODO: [P2] We should not set "display" in styleSet, this will allow the user to break the layout for no good reasons.
       display: 'flex',
       padding: paddingRegular,
       textDecoration: 'none',

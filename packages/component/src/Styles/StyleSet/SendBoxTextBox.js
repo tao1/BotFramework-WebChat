@@ -1,25 +1,16 @@
-import {
-  primaryFont
-} from '../Fonts';
-
-export default function createSendBoxTextBoxStyle({
-  paddingRegular
-}) {
-  return  {
-    ...primaryFont,
-
+export default function createSendBoxTextBoxStyle({ primaryFont, sendBoxTextColor }) {
+  return {
     alignItems: 'center',
+    fontFamily: primaryFont,
 
     '& > input': {
       border: 0,
+      color: sendBoxTextColor,
       fontFamily: 'inherit',
       fontSize: 'inherit',
       height: '100%',
       outline: 0,
-      paddingBottom: 0,
-      paddingLeft: paddingRegular,
-      paddingRight: paddingRegular,
-      paddingTop: 0
+      padding: 0
     }
   };
 }

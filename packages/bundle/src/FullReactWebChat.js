@@ -1,33 +1,61 @@
 import * as adaptiveCards from 'adaptivecards';
+import BasicWebChat, { concatMiddleware } from 'botframework-webchat-component';
 import memoize from 'memoize-one';
+import PropTypes from 'prop-types';
 import React from 'react';
 
-import BasicWebChat, { createAdaptiveCardsAttachmentMiddleware, concatMiddleware } from 'botframework-webchat-component';
-
+import createAdaptiveCardsAttachmentMiddleware from './adaptiveCards/createAdaptiveCardMiddleware';
+import createStyleSet from './adaptiveCards/Styles/createStyleSetWithAdaptiveCards';
+import defaultAdaptiveCardHostConfig from './adaptiveCards/Styles/adaptiveCardHostConfig';
 import renderMarkdown from './renderMarkdown';
 
 // Add additional props to <WebChat>, so it support additional features
-export default class extends React.Component {
+class FullReactWebChat extends React.Component {
   constructor(props) {
     super(props);
 
-    const adaptiveCardsAttachmentMiddleware = createAdaptiveCardsAttachmentMiddleware({ adaptiveCards });
-
-    this.createAttachmentMiddleware = memoize(middlewareFromProps => concatMiddleware(
-      middlewareFromProps,
-      adaptiveCardsAttachmentMiddleware
-    ));
+    this.createAttachmentMiddleware = memoize((adaptiveCardHostConfig, middlewareFromProps, styleOptions) =>
+      concatMiddleware(
+        middlewareFromProps,
+        createAdaptiveCardsAttachmentMiddleware({
+          adaptiveCardHostConfig: adaptiveCardHostConfig || defaultAdaptiveCardHostConfig(styleOptions),
+          adaptiveCards
+        })
+      )
+    );
   }
 
   render() {
-    const { attachmentMiddleware, ...otherProps } = this.props;
+    const { adaptiveCardHostConfig, attachmentMiddleware, styleOptions, styleSet, ...otherProps } = this.props;
 
     return (
       <BasicWebChat
-        attachmentMiddleware={ this.createAttachmentMiddleware(attachmentMiddleware) }
-        renderMarkdown={ renderMarkdown }
-        { ...otherProps }
+        attachmentMiddleware={this.createAttachmentMiddleware(
+          adaptiveCardHostConfig,
+          attachmentMiddleware,
+          styleOptions
+        )}
+        renderMarkdown={renderMarkdown}
+        styleOptions={styleOptions}
+        styleSet={styleSet || createStyleSet(styleOptions)}
+        {...otherProps}
       />
     );
   }
 }
+
+FullReactWebChat.defaultProps = {
+  adaptiveCardHostConfig: undefined,
+  attachmentMiddleware: undefined,
+  styleOptions: undefined,
+  styleSet: undefined
+};
+
+FullReactWebChat.propTypes = {
+  adaptiveCardHostConfig: PropTypes.any,
+  attachmentMiddleware: PropTypes.func,
+  styleOptions: PropTypes.any,
+  styleSet: PropTypes.any
+};
+
+export default FullReactWebChat;
